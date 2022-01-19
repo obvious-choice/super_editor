@@ -36,6 +36,26 @@ const strikethroughAttribution = NamedAttribution('strikethrough');
 /// Code style attribution.
 const codeAttribution = NamedAttribution('code');
 
+/// Sub-script style attribution.
+class SubscriptAttribution extends NamedAttribution {
+  SubscriptAttribution() : super('subscript');
+
+  @override
+  bool canMergeWith(Attribution other) {
+    return other is! SuperscriptAttribution && super.canMergeWith(other);
+  }
+}
+
+/// Super-script style attribution.
+class SuperscriptAttribution extends NamedAttribution {
+  SuperscriptAttribution() : super('superscript');
+
+  @override
+  bool canMergeWith(Attribution other) {
+    return other is! SubscriptAttribution && super.canMergeWith(other);
+  }
+}
+
 /// Attribution to be used within [AttributedText] to
 /// represent a link.
 ///

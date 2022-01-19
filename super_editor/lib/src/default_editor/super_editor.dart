@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart' hide SelectableText;
 import 'package:super_editor/src/core/document.dart';
@@ -468,7 +470,7 @@ const defaultSelectionStyle = SelectionStyle(
   selectionColor: Color(0xFFACCEF7),
 );
 
-/// Creates [TextStyles] for the standard [SuperEditor].
+/// Creates [TextStyle]s for the standard [SuperEditor].
 TextStyle defaultStyleBuilder(Set<Attribution> attributions) {
   TextStyle newStyle = const TextStyle(
     color: Colors.black,
@@ -513,6 +515,18 @@ TextStyle defaultStyleBuilder(Set<Attribution> attributions) {
       newStyle = newStyle.copyWith(
         color: Colors.lightBlue,
         decoration: TextDecoration.underline,
+      );
+    } else if (attribution is SuperscriptAttribution) {
+      newStyle = newStyle.copyWith(
+        fontFeatures: [
+          const FontFeature.superscripts(),
+        ],
+      );
+    } else if (attribution is SubscriptAttribution) {
+      newStyle = newStyle.copyWith(
+        fontFeatures: [
+          const FontFeature.subscripts(),
+        ],
       );
     }
   }
