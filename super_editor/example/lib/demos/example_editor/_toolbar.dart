@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:super_editor/super_editor.dart';
 
 /// Small toolbar that is intended to display near some selected
 /// text and offer a few text formatting controls.
@@ -235,6 +235,40 @@ class _EditorToolbarState extends State<EditorToolbar> {
       ToggleTextAttributionsCommand(
         documentSelection: widget.composer!.selection!,
         attributions: {strikethroughAttribution},
+      ),
+    );
+  }
+
+  /// Toggles superscript styling for the current selected text.
+  void _toggleSuperscript() {
+    /// Superscript and subscript cannot coexist, one must be turned off before turning on the other
+    widget.editor!.executeCommand(
+      RemoveTextAttributionsCommand(
+        documentSelection: widget.composer!.selection!,
+        attributions: {SubscriptAttribution()},
+      ),
+    );
+    widget.editor!.executeCommand(
+      AddTextAttributionsCommand(
+        documentSelection: widget.composer!.selection!,
+        attributions: {SuperscriptAttribution()},
+      ),
+    );
+  }
+
+  /// Toggles subscript styling for the current selected text.
+  void _toggleSubscript() {
+    /// Superscript and subscript cannot coexist, one must be turned off before turning on the other
+    widget.editor!.executeCommand(
+      RemoveTextAttributionsCommand(
+        documentSelection: widget.composer!.selection!,
+        attributions: {SuperscriptAttribution()},
+      ),
+    );
+    widget.editor!.executeCommand(
+      AddTextAttributionsCommand(
+        documentSelection: widget.composer!.selection!,
+        attributions: {SubscriptAttribution()},
       ),
     );
   }
@@ -533,6 +567,22 @@ class _EditorToolbarState extends State<EditorToolbar> {
                 color: _isSingleLinkSelected() ? const Color(0xFF007AFF) : IconTheme.of(context).color,
                 splashRadius: 16,
                 tooltip: AppLocalizations.of(context)!.labelLink,
+              ),
+            ),
+            Center(
+              child: IconButton(
+                onPressed: _toggleSuperscript,
+                icon: const Icon(Icons.superscript),
+                splashRadius: 16,
+                tooltip: 'Superscript',
+              ),
+            ),
+            Center(
+              child: IconButton(
+                onPressed: _toggleSubscript,
+                icon: const Icon(Icons.subscript),
+                splashRadius: 16,
+                tooltip: 'Subscript',
               ),
             ),
             // Only display alignment controls if the currently selected text
