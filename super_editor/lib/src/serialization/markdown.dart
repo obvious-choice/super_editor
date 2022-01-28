@@ -1,9 +1,9 @@
 import 'dart:convert';
 
+import 'package:charcode/charcode.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:super_editor/src/default_editor/attributions.dart';
-import 'package:super_editor/super_editor.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:super_editor/super_editor.dart';
 
 // TODO: return a regular Document instead of a MutableDocument.
 //       For now, we return MutableDocument because DocumentEditor
@@ -34,9 +34,13 @@ String serializeDocumentToMarkdown(Document doc) {
     final node = doc.nodes[i];
 
     if (node is ImageNode) {
-      buffer..writeln('![${node.altText}](${node.imageUrl})')..writeln('');
+      buffer
+        ..writeln('![${node.altText}](${node.imageUrl})')
+        ..writeln('');
     } else if (node is HorizontalRuleNode) {
-      buffer..writeln('---')..writeln('');
+      buffer
+        ..writeln('---')
+        ..writeln('');
     } else if (node is ListItemNode) {
       final indent = List.generate(node.indent + 1, (index) => '  ').join('');
       final symbol = node.type == ListItemType.unordered ? '*' : '1.';
@@ -54,20 +58,34 @@ String serializeDocumentToMarkdown(Document doc) {
       final Attribution? blockType = metadata['blockType'];
 
       if (blockType == header1Attribution) {
-        buffer..writeln('# ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('# ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == header2Attribution) {
-        buffer..writeln('## ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('## ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == header3Attribution) {
-        buffer..writeln('### ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('### ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == header4Attribution) {
-        buffer..writeln('#### ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('#### ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == header5Attribution) {
-        buffer..writeln('##### ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('##### ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == header6Attribution) {
-        buffer..writeln('###### ${node.text.toMarkdown()}')..writeln('');
+        buffer
+          ..writeln('###### ${node.text.toMarkdown()}')
+          ..writeln('');
       } else if (blockType == blockquoteAttribution) {
         // TODO: handle multiline
-        buffer..writeln('> ${node.text.toMarkdown()}')..writeln();
+        buffer
+          ..writeln('> ${node.text.toMarkdown()}')
+          ..writeln();
       } else if (blockType == codeAttribution) {
         buffer //
           ..writeln('```') //
@@ -75,7 +93,9 @@ String serializeDocumentToMarkdown(Document doc) {
           ..writeln('```')
           ..writeln('');
       } else {
-        buffer..writeln(node.text.toMarkdown())..writeln('');
+        buffer
+          ..writeln(node.text.toMarkdown())
+          ..writeln('');
       }
     }
   }
@@ -86,7 +106,7 @@ String serializeDocumentToMarkdown(Document doc) {
 /// Converts structured markdown to a list of [DocumentNode]s.
 ///
 /// To use [_MarkdownToDocument], obtain a series of markdown
-/// nodes from a [BlockParser] (from the markdown package) and
+/// nodes from a [md.BlockParser] (from the markdown package) and
 /// then visit each of the nodes with a [_MarkdownToDocument].
 /// After visiting all markdown nodes, [_MarkdownToDocument]
 /// contains [DocumentNode]s that correspond to the visited
@@ -305,7 +325,20 @@ class _MarkdownToDocument implements md.NodeVisitor {
   }
 
   _InlineMarkdownToDocument _parseInline(md.Element element) {
-    final inlineParser = md.InlineParser(element.textContent, md.Document());
+    final inlineParser = md.InlineParser(
+        element.textContent,
+        md.Document(
+          extensionSet: md.ExtensionSet(
+            [],
+            [
+              md.TextSyntax(r' ~ ', startCharacter: $space),
+              md.TextSyntax(r' \^ ', startCharacter: $space),
+              md.TextSyntax(r'\^\^', startCharacter: $caret),
+              SuperscriptSyntax(),
+              SubscriptSyntax(),
+            ],
+          ),
+        ));
     final inlineVisitor = _InlineMarkdownToDocument();
     final inlineNodes = inlineParser.parse();
     for (final inlineNode in inlineNodes) {
@@ -388,6 +421,30 @@ class _InlineMarkdownToDocument implements md.NodeVisitor {
           end: styledText.text.length - 1,
         ),
       );
+    } else if (element.tag == 'sup') {
+      styledText.addAttribution(
+        SuperscriptAttribution(),
+        TextRange(
+          start: 0,
+          end: styledText.text.length - 1,
+        ),
+      );
+    } else if (element.tag == 'sub') {
+      styledText.addAttribution(
+        SubscriptAttribution(),
+        TextRange(
+          start: 0,
+          end: styledText.text.length - 1,
+        ),
+      );
+    } else if (element.tag == 'del') {
+      styledText.addAttribution(
+        strikethroughAttribution,
+        TextRange(
+          start: 0,
+          end: styledText.text.length - 1,
+        ),
+      );
     }
 
     if (_textStack.isNotEmpty) {
@@ -404,7 +461,14 @@ extension on AttributedText {
   /// order such that opening and closing styles match each other on
   /// the opening and closing ends of a span.
   static String _sortAndSerializeAttributions(Set<Attribution> attributions, AttributionVisitEvent event) {
-    const startOrder = [codeAttribution, boldAttribution, italicsAttribution, strikethroughAttribution];
+    final startOrder = [
+      codeAttribution,
+      boldAttribution,
+      italicsAttribution,
+      strikethroughAttribution,
+      SuperscriptAttribution(),
+      SubscriptAttribution(),
+    ];
 
     final buffer = StringBuffer();
     final encodingOrder = event == AttributionVisitEvent.start ? startOrder : startOrder.reversed;
@@ -426,6 +490,10 @@ extension on AttributedText {
     } else if (attribution == italicsAttribution) {
       return '*';
     } else if (attribution == strikethroughAttribution) {
+      return '~~';
+    } else if (attribution is SuperscriptAttribution) {
+      return '^';
+    } else if (attribution is SubscriptAttribution) {
       return '~';
     } else {
       return '';
@@ -447,11 +515,50 @@ extension on AttributedText {
         case AttributionVisitEvent.end:
           // +1 on end index because this visitor has inclusive indices
           // whereas substring() expects an exclusive ending index.
-          buffer..write(fullText.text.substring(spanStart, index + 1))..write(markdownStyles);
+          buffer
+            ..write(fullText.text.substring(spanStart, index + 1))
+            ..write(markdownStyles);
           break;
       }
     });
 
     return buffer.toString();
+  }
+}
+
+class SubscriptSyntax extends md.TagSyntax {
+  SubscriptSyntax()
+      : super(
+          _pattern,
+          requiresDelimiterRun: true,
+          allowIntraWord: true,
+          startCharacter: $tilde,
+        );
+
+  static const String _pattern = r'\~+';
+
+  @override
+  md.Node? close(md.InlineParser parser, md.Delimiter opener, md.Delimiter closer,
+      {required List<md.Node> Function() getChildren}) {
+    final condition = opener.length >= 2 && closer.length >= 2;
+    return md.Element(condition ? 'del' : 'sub', getChildren());
+  }
+}
+
+class SuperscriptSyntax extends md.TagSyntax {
+  SuperscriptSyntax()
+      : super(
+          _pattern,
+          requiresDelimiterRun: true,
+          allowIntraWord: true,
+          startCharacter: $caret,
+        );
+
+  static const String _pattern = r'\^';
+
+  @override
+  md.Node close(md.InlineParser parser, md.Delimiter opener, md.Delimiter closer,
+      {required List<md.Node> Function() getChildren}) {
+    return md.Element('sup', getChildren());
   }
 }
