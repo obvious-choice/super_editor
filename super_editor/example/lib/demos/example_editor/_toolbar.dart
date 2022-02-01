@@ -249,7 +249,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
       ),
     );
     widget.editor!.executeCommand(
-      AddTextAttributionsCommand(
+      ToggleTextAttributionsCommand(
         documentSelection: widget.composer!.selection!,
         attributions: {SuperscriptAttribution()},
       ),
@@ -266,7 +266,7 @@ class _EditorToolbarState extends State<EditorToolbar> {
       ),
     );
     widget.editor!.executeCommand(
-      AddTextAttributionsCommand(
+      ToggleTextAttributionsCommand(
         documentSelection: widget.composer!.selection!,
         attributions: {SubscriptAttribution()},
       ),

@@ -9,6 +9,14 @@ import '_toolbar.dart';
 /// This editor will expand in functionality as package
 /// capabilities expand.
 class ExampleEditor extends StatefulWidget {
+  final DocumentEditor? docEditor;
+  final Document? doc;
+
+  const ExampleEditor({
+    this.docEditor,
+    this.doc,
+  });
+
   @override
   _ExampleEditorState createState() => _ExampleEditorState();
 }
@@ -30,8 +38,9 @@ class _ExampleEditorState extends State<ExampleEditor> {
   @override
   void initState() {
     super.initState();
-    _doc = createInitialDocument()..addListener(_hideOrShowToolbar);
-    _docEditor = DocumentEditor(document: _doc as MutableDocument);
+    _doc = widget.doc ?? createInitialDocument()
+      ..addListener(_hideOrShowToolbar);
+    _docEditor = widget.docEditor ?? DocumentEditor(document: _doc as MutableDocument);
     _composer = DocumentComposer()..addListener(_hideOrShowToolbar);
     _editorFocusNode = FocusNode();
     _scrollController = ScrollController()..addListener(_hideOrShowToolbar);
