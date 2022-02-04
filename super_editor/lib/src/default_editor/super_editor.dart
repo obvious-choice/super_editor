@@ -78,15 +78,18 @@ class SuperEditor extends StatefulWidget {
     this.documentLayoutKey,
     this.maxWidth = 600,
     this.inputSource = DocumentInputSource.keyboard,
-    this.gestureMode,
+    this.gestureMode = DocumentGestureMode.mouse,
     this.androidToolbarBuilder,
     this.iOSToolbarBuilder,
+    this.createOverlayControlsClipper,
     required this.editor,
     this.composer,
     this.componentVerticalSpacing = 16,
     this.showDebugPaint = false,
+    this.autofocus = false,
   })  : componentBuilders = defaultComponentBuilders,
         keyboardActions = defaultKeyboardActions,
+        softwareKeyboardHandler = null,
         textStyleBuilder = defaultStyleBuilder,
         selectionStyle = defaultSelectionStyle,
         super(key: key);
@@ -100,17 +103,20 @@ class SuperEditor extends StatefulWidget {
     this.documentLayoutKey,
     this.maxWidth = 600,
     this.inputSource = DocumentInputSource.keyboard,
-    this.gestureMode,
+    this.gestureMode = DocumentGestureMode.mouse,
     this.androidToolbarBuilder,
     this.iOSToolbarBuilder,
+    this.createOverlayControlsClipper,
     required this.editor,
     this.composer,
     AttributionStyleBuilder? textStyleBuilder,
     SelectionStyle? selectionStyle,
     List<DocumentKeyboardAction>? keyboardActions,
+    this.softwareKeyboardHandler,
     List<ComponentBuilder>? componentBuilders,
     this.componentVerticalSpacing = 16,
     this.showDebugPaint = false,
+    this.autofocus = false,
   })  : textStyleBuilder = textStyleBuilder ?? defaultStyleBuilder,
         selectionStyle = selectionStyle ?? defaultSelectionStyle,
         keyboardActions = keyboardActions ?? defaultKeyboardActions,
@@ -127,17 +133,20 @@ class SuperEditor extends StatefulWidget {
     this.documentLayoutKey,
     this.maxWidth = 600,
     this.inputSource = DocumentInputSource.keyboard,
-    this.gestureMode,
+    this.gestureMode = DocumentGestureMode.mouse,
     this.androidToolbarBuilder,
     this.iOSToolbarBuilder,
+    this.createOverlayControlsClipper,
     required this.editor,
     this.composer,
     AttributionStyleBuilder? textStyleBuilder,
     SelectionStyle? selectionStyle,
     List<DocumentKeyboardAction>? keyboardActions,
+    this.softwareKeyboardHandler,
     List<ComponentBuilder>? componentBuilders,
     this.componentVerticalSpacing = 16,
     this.showDebugPaint = false,
+    this.autofocus = false,
   })  : textStyleBuilder = textStyleBuilder ?? defaultStyleBuilder,
         selectionStyle = selectionStyle ?? defaultSelectionStyle,
         keyboardActions = keyboardActions ?? defaultKeyboardActions,
@@ -146,6 +155,9 @@ class SuperEditor extends StatefulWidget {
 
   /// [FocusNode] for the entire `SuperEditor`.
   final FocusNode? focusNode;
+
+  /// Whether or not the [SuperEditor] should autofocus
+  final bool autofocus;
 
   /// Padding between the boundary of this `SuperEditor` and its
   /// document content, i.e., insets the content of this document
@@ -181,6 +193,15 @@ class SuperEditor extends StatefulWidget {
   /// Builder that creates a floating toolbar when running on iOS.
   final WidgetBuilder? iOSToolbarBuilder;
 
+  /// Creates a clipper that applies to overlay controls, like drag
+  /// handles, magnifiers, and popover toolbars, preventing the overlay
+  /// controls from appearing outside the given clipping region.
+  ///
+  /// If no clipper factory method is provided, then the overlay controls
+  /// will be allowed to appear anywhere in the overlay in which they sit
+  /// (probably the entire screen).
+  final CustomClipper<Rect> Function(BuildContext overlayContext)? createOverlayControlsClipper;
+
   /// Contains a [Document] and alters that document as desired.
   final DocumentEditor editor;
 
@@ -206,7 +227,15 @@ class SuperEditor extends StatefulWidget {
   /// All actions that this editor takes in response to key
   /// events, e.g., text entry, newlines, character deletion,
   /// copy, paste, etc.
+  ///
+  /// These actions are only used when in [DocumentInputSource.keyboard]
+  /// mode.
   final List<DocumentKeyboardAction> keyboardActions;
+
+  /// Applies all software keyboard edits to the document.
+  ///
+  /// This handler is only used when in [DocumentInputSource.ime] mode.
+  final SoftwareKeyboardHandler? softwareKeyboardHandler;
 
   /// The vertical distance between visual components in the document layout.
   final double componentVerticalSpacing;
@@ -230,6 +259,8 @@ class _SuperEditorState extends State<SuperEditor> {
   DocumentPosition? _previousSelectionExtent;
 
   late EditContext _editContext;
+  late SoftwareKeyboardHandler _softwareKeyboardHandler;
+  final _floatingCursorController = FloatingCursorController();
 
   @override
   void initState() {
@@ -243,6 +274,13 @@ class _SuperEditorState extends State<SuperEditor> {
     _docLayoutKey = widget.documentLayoutKey ?? GlobalKey();
 
     _createEditContext();
+
+    _softwareKeyboardHandler = widget.softwareKeyboardHandler ??
+        SoftwareKeyboardHandler(
+          editor: _editContext.editor,
+          composer: _editContext.composer,
+          commonOps: _editContext.commonOps,
+        );
   }
 
   @override
@@ -265,6 +303,14 @@ class _SuperEditorState extends State<SuperEditor> {
     }
     if (widget.documentLayoutKey != oldWidget.documentLayoutKey) {
       _docLayoutKey = widget.documentLayoutKey ?? GlobalKey();
+    }
+    if (widget.softwareKeyboardHandler != oldWidget.softwareKeyboardHandler) {
+      _softwareKeyboardHandler = widget.softwareKeyboardHandler ??
+          SoftwareKeyboardHandler(
+            editor: _editContext.editor,
+            composer: _editContext.composer,
+            commonOps: _editContext.commonOps,
+          );
     }
 
     _createEditContext();
@@ -364,6 +410,7 @@ class _SuperEditorState extends State<SuperEditor> {
       case DocumentInputSource.keyboard:
         return DocumentKeyboardInteractor(
           focusNode: _focusNode,
+          autofocus: widget.autofocus,
           editContext: _editContext,
           keyboardActions: widget.keyboardActions,
           child: child,
@@ -371,7 +418,10 @@ class _SuperEditorState extends State<SuperEditor> {
       case DocumentInputSource.ime:
         return DocumentImeInteractor(
           focusNode: _focusNode,
+          autofocus: widget.autofocus,
           editContext: _editContext,
+          softwareKeyboardHandler: _softwareKeyboardHandler,
+          floatingCursorController: _floatingCursorController,
           child: child,
         );
     }
@@ -401,6 +451,7 @@ class _SuperEditorState extends State<SuperEditor> {
           scrollController: widget.scrollController,
           documentKey: _docLayoutKey,
           popoverToolbarBuilder: widget.androidToolbarBuilder ?? (_) => const SizedBox(),
+          createOverlayControlsClipper: widget.createOverlayControlsClipper,
           showDebugPaint: widget.showDebugPaint,
           child: child,
         );
@@ -413,6 +464,8 @@ class _SuperEditorState extends State<SuperEditor> {
           scrollController: widget.scrollController,
           documentKey: _docLayoutKey,
           popoverToolbarBuilder: widget.iOSToolbarBuilder ?? (_) => const SizedBox(),
+          floatingCursorController: _floatingCursorController,
+          createOverlayControlsClipper: widget.createOverlayControlsClipper,
           showDebugPaint: widget.showDebugPaint,
           child: child,
         );
@@ -507,9 +560,17 @@ TextStyle defaultStyleBuilder(Set<Attribution> attributions) {
       newStyle = newStyle.copyWith(
         fontStyle: FontStyle.italic,
       );
+    } else if (attribution == underlineAttribution) {
+      newStyle = newStyle.copyWith(
+        decoration: newStyle.decoration == null
+            ? TextDecoration.underline
+            : TextDecoration.combine([TextDecoration.underline, newStyle.decoration!]),
+      );
     } else if (attribution == strikethroughAttribution) {
       newStyle = newStyle.copyWith(
-        decoration: TextDecoration.lineThrough,
+        decoration: newStyle.decoration == null
+            ? TextDecoration.lineThrough
+            : TextDecoration.combine([TextDecoration.lineThrough, newStyle.decoration!]),
       );
     } else if (attribution is LinkAttribution) {
       newStyle = newStyle.copyWith(
