@@ -445,6 +445,14 @@ class _InlineMarkdownToDocument implements md.NodeVisitor {
           end: styledText.text.length - 1,
         ),
       );
+    } else if (element.tag == 'a') {
+      styledText.addAttribution(
+        LinkAttribution(url: Uri.parse(element.attributes['href'] ?? '')),
+        TextRange(
+          start: 0,
+          end: styledText.text.length - 1,
+        ),
+      );
     }
 
     if (_textStack.isNotEmpty) {
@@ -506,6 +514,20 @@ extension on AttributedText {
 
     visitAttributions((fullText, index, attributions, event) {
       final markdownStyles = _sortAndSerializeAttributions(attributions, event);
+
+      /// TODO: redesign serialisation to support link with styles
+      for (final attribution in attributions) {
+        if (attribution is LinkAttribution) {
+          if (event == AttributionVisitEvent.start) {
+            spanStart = index;
+            buffer.write('[');
+            return;
+          } else {
+            buffer.write('${fullText.text.substring(spanStart, index + 1)}](${attribution.url})');
+            return;
+          }
+        }
+      }
 
       switch (event) {
         case AttributionVisitEvent.start:
